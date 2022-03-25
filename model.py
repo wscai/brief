@@ -1,22 +1,35 @@
 import torch
+import torch.nn as nn
 
 
 class Model_MNIST(torch.nn.Module):
 
     def __init__(self):
         super(Model_MNIST, self).__init__()
-        self.conv1 = torch.nn.Sequential(torch.nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1),
-                                         torch.nn.ReLU(),
-                                         torch.nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
-                                         torch.nn.ReLU(),
-                                         torch.nn.MaxPool2d(stride=2, kernel_size=2))
-        self.dense = torch.nn.Sequential(torch.nn.Linear(14 * 14 * 128, 1024),
-                                         torch.nn.ReLU())
-        self.dense1 = torch.nn.Sequential(torch.nn.Dropout(p=0.5),
-                                          torch.nn.Linear(1024, 10))
+        self.conv1 = nn.Sequential(  # input_size=(1*28*28)
+            nn.Conv2d(1, 6, 5, 1, 2),  # padding=2保证输入输出尺寸相同
+            nn.ReLU(),  # input_size=(6*28*28)
+            nn.MaxPool2d(kernel_size=2, stride=2),  # output_size=(6*14*14)
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(6, 16, 5),
+            nn.ReLU(),  # input_size=(16*10*10)
+            nn.MaxPool2d(2, 2)  # output_size=(16*5*5)
+        )
+        self.fc1 = torch.nn.Sequential(
+            torch.nn.Linear(16 * 5 * 5, 120),
+            torch.nn.ReLU())
+        self.fc2 = nn.Sequential(
+            nn.Linear(120, 64),
+            nn.ReLU()
+        )
+        self.fc3 = torch.nn.Sequential(torch.nn.Linear(64, 10))
 
     def forward(self, x):
         x = self.conv1(x)
-        x = x.view(-1, 14 * 14 * 128)
-        x = self.dense(x)
+        x = self.conv2(x)
+        x = x.view(x.size()[0], -1)
+        x = self.fc1(x)
+        x = self.fc2(x)
+        x = self.fc3(x)
         return x
