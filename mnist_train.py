@@ -31,7 +31,8 @@ def train_loop(dataloader, model, Loss_fn, Optimizer):
         index_list = torch.cat([index_list, index])
         pred = model(X)
         # mid_list = torch.cat([mid_list, mid])
-        records = aum_calculator.update(pred, y, [int(I) for I in index])
+        # records = aum_calculator.update((pred-pred.min(1)[0].unsqueeze(1))/(pred.max(1)[0]-pred.min(1)[0]).unsqueeze(1), y, [int(I) for I in index])
+        records = aum_calculator.update((pred - pred.mean())/pred.std(), y, [int(I) for I in index])
         loss = Loss_fn(pred, y)
         loss.backward()
         Optimizer.step()
@@ -40,6 +41,23 @@ def train_loop(dataloader, model, Loss_fn, Optimizer):
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
     return index_list
 
+def train_loop_aum_renew(dataloader, model, Loss_fn, Optimizer, pruning_factor=0.5):
+    size = len(dataloader.dataset)
+    index_list = torch.Tensor()
+    # mid_list = torch.Tensor()
+    for batch, (index, X, y) in enumerate(dataloader):
+        Optimizer.zero_grad()
+        index_list = torch.cat([index_list, index])
+        pred = model(X)
+        # mid_list = torch.cat([mid_list, mid])
+        records = aum_calculator.update((pred - pred.mean())/pred.std(), y, [int(I) for I in index])
+        loss = Loss_fn(pred, y)
+        loss.backward()
+        Optimizer.step()
+        if batch % 100 == 0:
+            loss, current = loss.item(), batch * len(X)
+            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+    return index_list, [j[1] for j in sorted([(aum_calculator.sums[i],i) for i in aum_calculator.sums.keys()])][:int(len(aum_calculator.sums.keys())*pruning_factor)]
 
 def test_loop(dataloader, model, loss_fn):
     size = len(dataloader.dataset)
@@ -71,11 +89,6 @@ data_train = MNIST_train()
 data_test = MNIST_test()
 len_train = len(data_train)
 batch_size = 64
-delete = False
-batch_data = {
-    "%": 0.5,
-    "batch_size": batch_size
-}
 train_dataloader = torch.utils.data.DataLoader(dataset=data_train,
                                                batch_size=batch_size,
                                                shuffle=True)
@@ -88,9 +101,77 @@ for t in range(epochs):
     index_list1 = train_loop(train_dataloader, Model, loss_fn, optimizer)
     test_loop(test_dataloader, Model, loss_fn)
     scheduler.step()
-if record_aum:
-    aum_calculator.finalize()
 print("Done!")
+
+#%% Dynamically pruning based on AUM score
+aumm = []
+factor = 0.83
+with open('aum/aum_values.csv', newline='') as csvfile:
+    reader = csv.reader(csvfile, delimiter=' ', quotechar='|')
+    ii = 0
+    for i in reader:
+        if ii == 0:
+            ii += 1
+            continue
+        aumm.append(int(re.findall(r'\d.*?,', i[0])[0][:-1]))
+writer = SummaryWriter()
+data_train = MNIST_train()
+data_test = MNIST_test()
+epochs = 10
+batch_size = 64
+test_dataloader = torch.utils.data.DataLoader(dataset=data_test,
+                                              batch_size=batch_size,
+                                              shuffle=True)
+loss_fn = torch.nn.CrossEntropyLoss()
+
+# Base
+Model = Model_MNIST()
+optimizer = torch.optim.Adam(Model.parameters(), lr=0.001)
+train_dataloader = torch.utils.data.DataLoader(dataset=data_train,
+                                               batch_size=batch_size,
+                                               shuffle=True)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.75)
+# dynamically pruning
+Model_p = Model_MNIST()
+optimizer_p = torch.optim.Adam(Model_p.parameters(), lr=0.001)
+train_dataloader_p = torch.utils.data.DataLoader(dataset=data_train,
+                                               batch_size=batch_size,
+                                               shuffle=True)
+scheduler_p = torch.optim.lr_scheduler.StepLR(optimizer_p, step_size=1, gamma=0.75)
+
+# random
+data_train_f_random = MNIST_train(remain=random.choices(aumm, k=int(len(aumm) / 2)))
+Model_f_random = Model_MNIST()
+optimizer_f_random = torch.optim.Adam(Model_f_random.parameters(), lr=LR)
+train_dataloader_f_random = torch.utils.data.DataLoader(dataset=data_train_f_random,
+                                                        batch_size=batch_size,
+                                                        shuffle=True)
+scheduler_random = torch.optim.lr_scheduler.StepLR(optimizer_f_random, step_size=1, gamma=0.75)
+for t in range(epochs):
+    print(f"Epoch {t + 1}, LR = {optimizer.state_dict()['param_groups'][0]['lr']}\n-------------------------------")
+    index_list1 = train_loop(train_dataloader, Model, loss_fn, optimizer)
+    print(f"Epoch {t + 1}, LR = {optimizer_p.state_dict()['param_groups'][0]['lr']}\n-------------------------------")
+    aum_calculator = AUMCalculator(save_dir, compressed=True)
+    index_list2,aum_rank = train_loop_aum_renew(train_dataloader_p,Model_p,loss_fn,optimizer_p,factor)
+    break
+    data_train_p = MNIST_train(remain = aum_rank)
+    train_dataloader_p = torch.utils.data.DataLoader(dataset=data_train_p,
+                                               batch_size=batch_size,
+                                               shuffle=True)
+    index_list_random = train_loop(train_dataloader_f_random, Model_f_random, loss_fn, optimizer_f_random)
+    acc, loss = test_loop(test_dataloader, Model, loss_fn)
+    acc_p, loss_p = test_loop(test_dataloader, Model_p, loss_fn)
+    acc_r, loss_r = test_loop(test_dataloader, Model_f_random, loss_fn)
+    writer.add_scalars('ACC_1', {'full_data': acc,'dynamic_aum': acc_p, 'random':acc_r}, t)
+    writer.add_scalars('LOSS_1', {'full_data': loss,'dynamic_aum': loss_p, 'random':loss_r}, t)
+    scheduler_p.step()
+    scheduler.step()
+    scheduler_random.step()
+
+print("Done!")
+
+
+
 
 # %% AUM analysis + splitting
 aum_rank = []
@@ -175,5 +256,6 @@ for t in range(epochs):
     scheduler_f_aum.step()
     scheduler_f_aum_w.step()
     scheduler_f_random.step()
+
 print("Done!")
 writer.close()
