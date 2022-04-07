@@ -130,43 +130,42 @@ optimizer = torch.optim.Adam(Model.parameters(), lr=0.001)
 train_dataloader = torch.utils.data.DataLoader(dataset=data_train,
                                                batch_size=batch_size,
                                                shuffle=True)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.75)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.9)
 # dynamically pruning
 Model_p = Model_MNIST()
 optimizer_p = torch.optim.Adam(Model_p.parameters(), lr=0.001)
 train_dataloader_p = torch.utils.data.DataLoader(dataset=data_train,
                                                batch_size=batch_size,
                                                shuffle=True)
-scheduler_p = torch.optim.lr_scheduler.StepLR(optimizer_p, step_size=1, gamma=0.75)
+scheduler_p = torch.optim.lr_scheduler.StepLR(optimizer_p, step_size=1, gamma=0.9)
 
 # random
-data_train_f_random = MNIST_train(remain=random.choices(aumm, k=int(len(aumm) / 2)))
-Model_f_random = Model_MNIST()
-optimizer_f_random = torch.optim.Adam(Model_f_random.parameters(), lr=LR)
-train_dataloader_f_random = torch.utils.data.DataLoader(dataset=data_train_f_random,
-                                                        batch_size=batch_size,
-                                                        shuffle=True)
-scheduler_random = torch.optim.lr_scheduler.StepLR(optimizer_f_random, step_size=1, gamma=0.75)
+# data_train_f_random = MNIST_train(remain=random.choices(aumm, k=int(len(aumm) / 2)))
+# Model_f_random = Model_MNIST()
+# optimizer_f_random = torch.optim.Adam(Model_f_random.parameters(), lr=LR)
+# train_dataloader_f_random = torch.utils.data.DataLoader(dataset=data_train_f_random,
+#                                                         batch_size=batch_size,
+#                                                         shuffle=True)
+# scheduler_random = torch.optim.lr_scheduler.StepLR(optimizer_f_random, step_size=1, gamma=0.9)
 for t in range(epochs):
     print(f"Epoch {t + 1}, LR = {optimizer.state_dict()['param_groups'][0]['lr']}\n-------------------------------")
     index_list1 = train_loop(train_dataloader, Model, loss_fn, optimizer)
     print(f"Epoch {t + 1}, LR = {optimizer_p.state_dict()['param_groups'][0]['lr']}\n-------------------------------")
     aum_calculator = AUMCalculator(save_dir, compressed=True)
     index_list2,aum_rank = train_loop_aum_renew(train_dataloader_p,Model_p,loss_fn,optimizer_p,factor)
-    break
     data_train_p = MNIST_train(remain = aum_rank)
     train_dataloader_p = torch.utils.data.DataLoader(dataset=data_train_p,
                                                batch_size=batch_size,
                                                shuffle=True)
-    index_list_random = train_loop(train_dataloader_f_random, Model_f_random, loss_fn, optimizer_f_random)
+    # index_list_random = train_loop(train_dataloader_f_random, Model_f_random, loss_fn, optimizer_f_random)
     acc, loss = test_loop(test_dataloader, Model, loss_fn)
     acc_p, loss_p = test_loop(test_dataloader, Model_p, loss_fn)
-    acc_r, loss_r = test_loop(test_dataloader, Model_f_random, loss_fn)
-    writer.add_scalars('ACC_1', {'full_data': acc,'dynamic_aum': acc_p, 'random':acc_r}, t)
-    writer.add_scalars('LOSS_1', {'full_data': loss,'dynamic_aum': loss_p, 'random':loss_r}, t)
+    # acc_r, loss_r = test_loop(test_dataloader, Model_f_random, loss_fn)
+    writer.add_scalars('ACC_1', {'full_data': acc,'dynamic_aum': acc_p}, t)
+    writer.add_scalars('LOSS_1', {'full_data': loss,'dynamic_aum': loss_p}, t)
     scheduler_p.step()
     scheduler.step()
-    scheduler_random.step()
+    # scheduler_random.step()
 
 print("Done!")
 

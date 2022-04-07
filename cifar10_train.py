@@ -1,5 +1,3 @@
-import aum
-
 from dataset import Cifar10_test, Cifar10_train
 from model import Model_Cifar10
 import torch
@@ -7,8 +5,6 @@ from aum import AUMCalculator
 import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
-import csv
-import re
 import random
 import time
 
@@ -30,7 +26,7 @@ aum_calculator = AUMCalculator(save_dir, compressed=True)
 writer = SummaryWriter()
 gamma = 0.9
 # PR = 0.41
-PR = 1.36
+PR = 1.33
 
 def train_loop(dataloader, model, Loss_fn, Optimizer,record_aum=False):
     size = len(dataloader.dataset)
@@ -115,8 +111,8 @@ for t in range(epochs):
     train_loop(train_dataloader_aum, Model_aum, loss_fn, optimizer_aum,True)
     #sp = split(0,0.83,[j[1] for j in sorted([(aum_calculator.sums[i],i) for i in aum_calculator.sums.keys()])])
     sp = [j[1] for j in [(aum_calculator.sums[i],i) for i in aum_calculator.sums.keys() if aum_calculator.sums[i]<=PR]]
-    sp2 = list(set(data_train_full.remain)-set(sp))
-    sp+=random.choices(sp2,k=int(len(sp2)*0.1))
+    # sp2 = list(set(data_train_full.remain)-set(sp))
+    # sp+=random.choices(sp2,k=int(len(sp2)*0.1))
     # data_train_aum = Cifar10_train(remain=
     #                                sp[0]+random.choices(sp[1],k=int(len(sp[1])*0.1))
     #                                )
