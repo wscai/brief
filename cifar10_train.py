@@ -9,8 +9,8 @@ import random
 import time
 
 # %% Hyper parameter and Train/Test Loop
-random_seed = 1313
-torch.manual_seed(random_seed)
+# random_seed = 1313
+# torch.manual_seed(random_seed)
 LR = 0.001
 # %% Training and Testing and Recording
 epochs = 15
@@ -26,7 +26,7 @@ aum_calculator = AUMCalculator(save_dir, compressed=True)
 writer = SummaryWriter()
 gamma = 0.9
 # PR = 0.41
-PR = 1.33
+PR = 1.34
 
 def train_loop(dataloader, model, Loss_fn, Optimizer,record_aum=False):
     size = len(dataloader.dataset)
@@ -106,13 +106,13 @@ for t in range(epochs):
 
     start = time.time()
     aum_calculator = AUMCalculator(save_dir, compressed=True)
-    random_seed = 13
-    torch.manual_seed(random_seed)
+    # random_seed = 13
+    # torch.manual_seed(random_seed)
     train_loop(train_dataloader_aum, Model_aum, loss_fn, optimizer_aum,True)
     #sp = split(0,0.83,[j[1] for j in sorted([(aum_calculator.sums[i],i) for i in aum_calculator.sums.keys()])])
     sp = [j[1] for j in [(aum_calculator.sums[i],i) for i in aum_calculator.sums.keys() if aum_calculator.sums[i]<=PR]]
-    # sp2 = list(set(data_train_full.remain)-set(sp))
-    # sp+=random.choices(sp2,k=int(len(sp2)*0.1))
+    sp2 = list(set(data_train_full.remain)-set(sp))
+    sp+=random.choices(sp2,k=int(len(sp2)*0.1))
     # data_train_aum = Cifar10_train(remain=
     #                                sp[0]+random.choices(sp[1],k=int(len(sp[1])*0.1))
     #                                )
@@ -122,13 +122,12 @@ for t in range(epochs):
                                                        shuffle=True)
     aum_time += time.time()-start
     start = time.time()
-    random_seed = 13
-    torch.manual_seed(random_seed)
+    # random_seed = 13
+    # torch.manual_seed(random_seed)
     train_loop(train_dataloader_full, Model_full, loss_fn, optimizer_full)
     full_time+= time.time()-start
-
-    acc_f, loss_f = test_loop(test_dataloader, Model_full, loss_fn)
     acc_f_aum, loss_f_aum = test_loop(test_dataloader, Model_aum, loss_fn)
+    acc_f, loss_f = test_loop(test_dataloader, Model_full, loss_fn)
     writer.add_scalars('ACC', {'full_data': acc_f,
                                'aum': acc_f_aum}, t)
     writer.add_scalars('LOSS', {'full_data': loss_f,

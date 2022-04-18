@@ -8,8 +8,8 @@ import random
 import time
 
 # %% Hyper parameter and Train/Test Loop
-random_seed = 1313
-torch.manual_seed(random_seed)
+# random_seed = 1313
+# torch.manual_seed(random_seed)
 LR = 0.001
 # %% Training and Testing and Recording
 epochs = 15
@@ -25,7 +25,7 @@ aum_calculator = AUMCalculator(save_dir, compressed=True)
 writer = SummaryWriter()
 gamma = 0.9
 # PR = 0.41
-PR = 1.33
+PR = 1.335
 
 def train_loop(dataloader, model, Loss_fn, Optimizer,record_aum=False):
     size = len(dataloader.dataset)
@@ -102,20 +102,20 @@ for t in range(epochs):
 
     start = time.time()
     aum_calculator = AUMCalculator(save_dir, compressed=True)
-    random_seed = 13
-    torch.manual_seed(random_seed)
+    # random_seed = 13
+    # torch.manual_seed(random_seed)
     train_loop(train_dataloader_aum, Model_aum, loss_fn, optimizer_aum,True)
     sp = [j[1] for j in [(aum_calculator.sums[i],i) for i in aum_calculator.sums.keys() if aum_calculator.sums[i]<=PR]]
-    # sp2 = list(set(data_train_full.remain)-set(sp))
-    # sp+=random.choices(sp2,k=int(len(sp2)*0.1))
+    sp2 = list(set(data_train_full.remain)-set(sp))
+    sp+=random.choices(sp2,k=int(len(sp2)*0.1))
     data_train_aum = fashionMNIST_train(remain=sp)
     train_dataloader_aum = torch.utils.data.DataLoader(dataset=data_train_aum,
                                                        batch_size=batch_size,
                                                        shuffle=True)
     aum_time += time.time()-start
     start = time.time()
-    random_seed = 13
-    torch.manual_seed(random_seed)
+    # random_seed = 13
+    # torch.manual_seed(random_seed)
     train_loop(train_dataloader_full, Model_full, loss_fn, optimizer_full)
     full_time+= time.time()-start
 
